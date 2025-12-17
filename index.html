@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="PWA para Recomendação de Adubação e Calagem - AgroCultive Soluções Rurais">
+    <meta name="theme-color" content="#16a34a">
+    <title>AgroCultive Soluções Rurais - Consultoria Agronômica</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logosemfundo.png">
+    <link rel="apple-touch-icon" href="logosemfundo.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- jsPDF para exportação PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Font Awesome para ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet.js para mapas -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-green-50 to-emerald-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 shadow-sm">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <img src="logosemfundo.png" alt="Logo AgroCultive" class="h-24 w-auto object-contain">
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="navigation.goToDashboard()" class="bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg transition-all duration-200 border border-gray-200">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </button>
+                    <button onclick="navigation.goToCRM()" class="bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg transition-all duration-200 border border-gray-200">
+                        <i class="fas fa-users mr-2"></i>CRM
+                    </button>
+                    <button onclick="navigation.goToColeta()" class="bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg transition-all duration-200 border border-gray-200">
+                        <i class="fas fa-map-marked-alt mr-2"></i>Nova Coleta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <!-- Tela Dashboard -->
+        <div id="screen-dashboard" class="screen"></div>
+
+        <!-- Tela CRM (Clientes e Talhões) -->
+        <div id="screen-crm" class="screen hidden"></div>
+
+        <!-- Tela Coleta de Campo -->
+        <div id="screen-coleta-campo" class="screen hidden"></div>
+
+        <!-- Tela Análise de Solo -->
+        <div id="screen-analise" class="screen hidden"></div>
+
+        <!-- Tela Recomendação Final -->
+        <div id="screen-recomendacao" class="screen hidden"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 text-white mt-8 py-6">
+        <div class="container mx-auto px-4 text-center">
+            <div class="flex items-center justify-center space-x-3 mb-2">
+                <img src="logosemfundo.png" alt="Logo AgroCultive" class="h-8 w-8 object-contain">
+                <p class="text-sm font-semibold">AgroCultive Soluções Rurais</p>
+            </div>
+            <p class="text-xs text-gray-400">© 2024 AgroCultive Soluções Rurais. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts - Ordem de carregamento importante -->
+    <!-- 1. Banco de dados e dados de culturas -->
+    <script src="database.js"></script>
+    <script src="culturas-db.js"></script>
+    
+    <!-- 2. Módulos de cálculo -->
+    <script src="calculos.js"></script>
+    
+    <!-- 3. Navegação -->
+    <script src="navigation.js"></script>
+    
+    <!-- 4. Módulos de UI -->
+    <script src="ui-dashboard.js"></script>
+    <script src="ui-crm.js"></script>
+    <script src="ui-coleta-campo.js"></script>
+    <script src="ui-analise.js"></script>
+    <script src="ui-recomendacao.js"></script>
+    
+    <!-- 5. App principal (orquestrador) -->
+    <script src="app.js"></script>
+    
+    <script>
+        // Registrar Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrado:', reg.scope))
+                    .catch(err => console.log('Erro ao registrar Service Worker:', err));
+            });
+        }
+    </script>
+</body>
+</html>
