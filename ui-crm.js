@@ -10,13 +10,27 @@ class CRMUI {
     }
 
     // ========== RENDERIZAÇÃO PRINCIPAL ==========
-    render() {
-        this.renderClientesList();
+    async render() {
+        await this.renderClientesList();
     }
 
     // ========== LISTAGEM DE CLIENTES ==========
-    renderClientesList() {
-        const clientes = db.getClientes();
+    async renderClientesList() {
+        // Aguardar db estar pronto
+        if (!window.db) {
+            console.warn('Database não está pronto ainda, aguardando...');
+            setTimeout(() => this.renderClientesList(), 200);
+            return;
+        }
+        
+        let clientes = [];
+        try {
+            const clientesResult = window.db.getClientes();
+            clientes = clientesResult instanceof Promise ? await clientesResult : clientesResult;
+        } catch (error) {
+            console.error('Erro ao carregar clientes:', error);
+            clientes = [];
+        }
 
         const html = `
             <div class="mb-6">
@@ -57,7 +71,8 @@ class CRMUI {
         }
 
         return clientes.map(cliente => {
-            const talhoes = db.getTalhoes(cliente.id);
+            // Talhões serão carregados dinamicamente - placeholder por enquanto
+            const talhoesCount = 0; // Será atualizado quando expandir
             return `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                     <div class="flex items-center justify-between">
@@ -67,7 +82,7 @@ class CRMUI {
                             ${cliente.localidade ? `<p class="text-sm text-gray-600"><i class="fas fa-map-marker-alt mr-1"></i>${cliente.localidade}${cliente.estado ? ' - ' + cliente.estado : ''}</p>` : ''}
                             ${cliente.contato ? `<p class="text-sm text-gray-600"><i class="fas fa-phone mr-1"></i>${cliente.contato}</p>` : ''}
                             <p class="text-sm text-gray-500 mt-2">
-                                <i class="fas fa-th-large mr-1"></i>${talhoes.length} Talhão(ões) cadastrado(s)
+                                <i class="fas fa-th-large mr-1"></i>Talhões cadastrados
                             </p>
                         </div>
                         <div class="flex space-x-2">
@@ -88,8 +103,16 @@ class CRMUI {
     }
 
     // ========== FORMULÁRIO DE CLIENTE ==========
-    showClienteForm(clienteId = null) {
-        const cliente = clienteId ? db.getCliente(clienteId) : null;
+    async showClienteForm(clienteId = null) {
+        let cliente = null;
+        if (clienteId && window.db) {
+            try {
+                const clienteResult = window.db.getCliente(clienteId);
+                cliente = clienteResult instanceof Promise ? await clienteResult : clienteResult;
+            } catch (error) {
+                console.error('Erro ao carregar cliente:', error);
+            }
+        }
         
         const html = `
             <div class="mb-6">
@@ -193,8 +216,13 @@ class CRMUI {
         }
     }
 
-    saveCliente(event) {
+    async saveCliente(event) {
         event.preventDefault();
+        if (!window.db) {
+            alert('Banco de dados não está pronto. Aguarde alguns instantes e tente novamente.');
+            return;
+        }
+        
         const id = document.getElementById('clienteId').value;
         const cliente = {
             nome: document.getElementById('clienteNome').value,
@@ -205,26 +233,56 @@ class CRMUI {
             contato: document.getElementById('clienteContato').value || null
         };
 
-        if (id) {
-            db.updateCliente(id, cliente);
-        } else {
-            db.addCliente(cliente);
+        try {
+            if (id) {
+                await window.db.updateCliente(id, cliente);
+            } else {
+                await window.db.addCliente(cliente);
+            }
+            await this.render();
+        } catch (error) {
+            console.error('Erro ao salvar cliente:', error);
+            alert('Erro ao salvar cliente. Tente novamente.');
         }
-
-        this.render();
     }
 
-    deleteCliente(id) {
+    async deleteCliente(id) {
+        if (!window.db) {
+            alert('Banco de dados não está pronto.');
+            return;
+        }
+        
         if (confirm('Tem certeza que deseja excluir este cliente? Todos os talhões e coletas relacionados serão excluídos.')) {
-            db.deleteCliente(id);
-            this.render();
+            try {
+                await window.db.deleteCliente(id);
+                await this.render();
+            } catch (error) {
+                console.error('Erro ao deletar cliente:', error);
+                alert('Erro ao deletar cliente. Tente novamente.');
+            }
         }
     }
 
     // ========== LISTAGEM DE TALHÕES ==========
-    showTalhoesList(clienteId) {
-        const cliente = db.getCliente(clienteId);
-        const talhoes = db.getTalhoes(clienteId);
+    async showTalhoesList(clienteId) {
+        if (!window.db) {
+            console.warn('Database não está pronto ainda');
+            setTimeout(() => this.showTalhoesList(clienteId), 200);
+            return;
+        }
+        
+        let cliente = null;
+        let talhoes = [];
+        
+        try {
+            const clienteResult = window.db.getCliente(clienteId);
+            cliente = clienteResult instanceof Promise ? await clienteResult : clienteResult;
+            
+            const talhoesResult = window.db.getTalhoes(clienteId);
+            talhoes = talhoesResult instanceof Promise ? await talhoesResult : talhoesResult;
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+        }
 
         const html = `
             <div class="mb-6">
@@ -265,8 +323,7 @@ class CRMUI {
         }
 
         return talhoes.map(talhao => {
-            const coletas = db.getColetas(talhao.id);
-            const analises = db.getAnalises(talhao.id);
+            // Coletas e análises serão carregadas dinamicamente
             return `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                     <div class="flex items-center justify-between">
@@ -274,8 +331,8 @@ class CRMUI {
                             <h4 class="font-bold text-gray-800">${talhao.nome}</h4>
                             <p class="text-sm text-gray-600">Cultura Alvo: <strong>${talhao.culturaAlvo ? getCulturaData(talhao.culturaAlvo)?.nome || talhao.culturaAlvo : 'Não informada'}</strong></p>
                             <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                                <span><i class="fas fa-map-marked-alt mr-1"></i>${coletas.length} Coleta(s)</span>
-                                <span><i class="fas fa-flask mr-1"></i>${analises.length} Análise(s)</span>
+                                <span><i class="fas fa-map-marked-alt mr-1"></i>Coletas</span>
+                                <span><i class="fas fa-flask mr-1"></i>Análises</span>
                             </div>
                         </div>
                         <div class="flex space-x-2">
@@ -296,8 +353,16 @@ class CRMUI {
     }
 
     // ========== FORMULÁRIO DE TALHÃO ==========
-    showTalhaoForm(clienteId, talhaoId = null) {
-        const talhao = talhaoId ? db.getTalhao(talhaoId) : null;
+    async showTalhaoForm(clienteId, talhaoId = null) {
+        let talhao = null;
+        if (talhaoId && window.db) {
+            try {
+                const talhaoResult = window.db.getTalhao(talhaoId);
+                talhao = talhaoResult instanceof Promise ? await talhaoResult : talhaoResult;
+            } catch (error) {
+                console.error('Erro ao carregar talhão:', error);
+            }
+        }
         
         const html = `
             <div class="mb-6">
@@ -356,8 +421,13 @@ class CRMUI {
         }
     }
 
-    saveTalhao(event, clienteId) {
+    async saveTalhao(event, clienteId) {
         event.preventDefault();
+        if (!window.db) {
+            alert('Banco de dados não está pronto.');
+            return;
+        }
+        
         const id = document.getElementById('talhaoId').value;
         const talhao = {
             clienteId: clienteId,
@@ -365,19 +435,33 @@ class CRMUI {
             culturaAlvo: document.getElementById('talhaoCulturaAlvo').value
         };
 
-        if (id) {
-            db.updateTalhao(id, talhao);
-        } else {
-            db.addTalhao(talhao);
+        try {
+            if (id) {
+                await window.db.updateTalhao(id, talhao);
+            } else {
+                await window.db.addTalhao(talhao);
+            }
+            await this.showTalhoesList(clienteId);
+        } catch (error) {
+            console.error('Erro ao salvar talhão:', error);
+            alert('Erro ao salvar talhão. Tente novamente.');
         }
-
-        this.showTalhoesList(clienteId);
     }
 
-    deleteTalhao(id, clienteId) {
+    async deleteTalhao(id, clienteId) {
+        if (!window.db) {
+            alert('Banco de dados não está pronto.');
+            return;
+        }
+        
         if (confirm('Tem certeza que deseja excluir este talhão? Todas as coletas e análises relacionadas serão excluídas.')) {
-            db.deleteTalhao(id);
-            this.showTalhoesList(clienteId);
+            try {
+                await window.db.deleteTalhao(id);
+                await this.showTalhoesList(clienteId);
+            } catch (error) {
+                console.error('Erro ao deletar talhão:', error);
+                alert('Erro ao deletar talhão. Tente novamente.');
+            }
         }
     }
 }

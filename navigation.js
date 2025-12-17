@@ -99,3 +99,4 @@ class Navigation {
 
 // Instância global de navegação
 const navigation = new Navigation();
+window.navigation = navigation;
