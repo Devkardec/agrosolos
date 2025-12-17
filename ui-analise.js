@@ -11,16 +11,29 @@ class AnaliseUI {
     }
 
     // ========== RENDERIZAR TELA DE ANÁLISE ==========
-    render(talhaoId = null) {
+    async render(talhaoId = null) {
         if (talhaoId) {
-            this.showForm(talhaoId);
+            await this.showForm(talhaoId);
         } else {
-            this.renderLista();
+            await this.renderLista();
         }
     }
 
-    renderLista() {
-        const analises = db.getAnalises();
+    async renderLista() {
+        if (!window.db) {
+            console.warn('Database não está pronto ainda, aguardando...');
+            setTimeout(() => this.renderLista(), 200);
+            return;
+        }
+        
+        let analises = [];
+        try {
+            const analisesResult = window.db.getAnalises();
+            analises = analisesResult instanceof Promise ? await analisesResult : analisesResult;
+        } catch (error) {
+            console.error('Erro ao carregar análises:', error);
+            analises = [];
+        }
         
         const html = `
             <div class="mb-6">
@@ -57,32 +70,23 @@ class AnaliseUI {
             `;
         }
 
+        // Renderizar lista de análises (dados já carregados)
         return analises.map(analise => {
-            const talhao = db.getTalhao(analise.talhaoId);
-            const cliente = talhao ? db.getCliente(talhao.clienteId) : null;
-            const recomendacoes = db.getRecomendacoes(analise.id);
-            
             return `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                     <div class="flex items-center justify-between">
                         <div class="flex-1">
-                            <h4 class="font-bold text-gray-800">${cliente?.nome || 'Cliente'} - ${talhao?.nome || 'Talhão'}</h4>
-                            <p class="text-sm text-gray-600">Data: ${new Date(analise.createdAt).toLocaleDateString('pt-BR')}</p>
-                            <p class="text-sm text-gray-500 mt-1">${recomendacoes.length > 0 ? 'Recomendação gerada' : 'Aguardando recomendação'}</p>
+                            <h4 class="font-bold text-gray-800">Análise ${analise.id ? analise.id.substring(0, 8) : 'N/A'}</h4>
+                            <p class="text-sm text-gray-600">Data: ${analise.createdAt ? new Date(analise.createdAt).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                            <p class="text-sm text-gray-500 mt-1">Análise de solo</p>
                         </div>
                         <div class="flex space-x-2">
                             <button onclick="analise.showForm(null, '${analise.id}')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded transition">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            ${recomendacoes.length > 0 ? `
-                                <button onclick="recomendacao.render('${analise.id}')" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded transition">
-                                    <i class="fas fa-file-pdf"></i> Ver Relatório
-                                </button>
-                            ` : `
-                                <button onclick="recomendacao.gerarRecomendacao('${analise.id}')" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded transition">
-                                    <i class="fas fa-calculator"></i> Gerar Recomendação
-                                </button>
-                            `}
+                            <button onclick="recomendacao.gerarRecomendacao('${analise.id}')" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded transition">
+                                <i class="fas fa-calculator"></i> Gerar Recomendação
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -90,9 +94,24 @@ class AnaliseUI {
         }).join('');
     }
 
-    showSelecaoTalhao() {
-        const talhoes = db.getTalhoes();
-        const clientes = db.getClientes();
+    async showSelecaoTalhao() {
+        if (!window.db) {
+            console.warn('Database não está pronto ainda');
+            setTimeout(() => this.showSelecaoTalhao(), 200);
+            return;
+        }
+        
+        let talhoes = [];
+        let clientes = [];
+        try {
+            const talhoesResult = window.db.getTalhoes();
+            talhoes = talhoesResult instanceof Promise ? await talhoesResult : talhoesResult;
+            
+            const clientesResult = window.db.getClientes();
+            clientes = clientesResult instanceof Promise ? await clientesResult : clientesResult;
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+        }
         
         if (talhoes.length === 0) {
             alert('Por favor, cadastre pelo menos um talhão antes de criar uma análise.');
@@ -131,7 +150,8 @@ class AnaliseUI {
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
                                 <option value="">Selecione o talhão</option>
                                 ${talhoes.map(t => {
-                                    const cliente = db.getCliente(t.clienteId);
+                                    // Buscar cliente correspondente nos clientes já carregados
+                                    const cliente = clientes.find(c => c.id === t.clienteId);
                                     return `<option value="${t.id}">${cliente?.nome || 'Cliente'} - ${t.nome}</option>`;
                                 }).join('')}
                             </select>
@@ -153,25 +173,41 @@ class AnaliseUI {
         document.body.insertAdjacentHTML('beforeend', html);
     }
 
-    onClienteChangeAnalise() {
-        const clienteId = document.getElementById('selectClienteAnalise').value;
+    async onClienteChangeAnalise() {
+        const clienteId = document.getElementById('selectClienteAnalise')?.value;
         const selectTalhao = document.getElementById('selectTalhaoAnalise');
         
-        const talhoes = clienteId ? db.getTalhoes(clienteId) : db.getTalhoes();
+        if (!selectTalhao || !window.db) return;
         
-        selectTalhao.innerHTML = '<option value="">Selecione o talhão</option>';
-        talhoes.forEach(talhao => {
-            const cliente = db.getCliente(talhao.clienteId);
-            const option = document.createElement('option');
-            option.value = talhao.id;
-            option.textContent = `${cliente?.nome || 'Cliente'} - ${talhao.nome}`;
-            selectTalhao.appendChild(option);
-        });
+        selectTalhao.innerHTML = '<option value="">Carregando...</option>';
+        
+        try {
+            let talhoes = [];
+            const talhoesResult = clienteId ? window.db.getTalhoes(clienteId) : window.db.getTalhoes();
+            talhoes = talhoesResult instanceof Promise ? await talhoesResult : talhoesResult;
+            
+            // Carregar clientes também para exibir nomes
+            let clientes = [];
+            const clientesResult = window.db.getClientes();
+            clientes = clientesResult instanceof Promise ? await clientesResult : clientesResult;
+            
+            selectTalhao.innerHTML = '<option value="">Selecione o talhão</option>';
+            talhoes.forEach(talhao => {
+                const cliente = clientes.find(c => c.id === talhao.clienteId);
+                const option = document.createElement('option');
+                option.value = talhao.id;
+                option.textContent = `${cliente?.nome || 'Cliente'} - ${talhao.nome}`;
+                selectTalhao.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar talhões:', error);
+            selectTalhao.innerHTML = '<option value="">Erro ao carregar</option>';
+        }
     }
 
-    iniciarNovaAnalise(event) {
+    async iniciarNovaAnalise(event) {
         event.preventDefault();
-        const talhaoId = document.getElementById('selectTalhaoAnalise').value;
+        const talhaoId = document.getElementById('selectTalhaoAnalise')?.value;
         
         if (!talhaoId) {
             alert('Por favor, selecione o talhão.');
@@ -179,7 +215,7 @@ class AnaliseUI {
         }
 
         this.closeModal();
-        this.showForm(talhaoId);
+        await this.showForm(talhaoId);
     }
 
     closeModal() {
@@ -190,10 +226,38 @@ class AnaliseUI {
     }
 
     // ========== FORMULÁRIO DE ANÁLISE COM CÁLCULOS AUTOMÁTICOS ==========
-    showForm(talhaoId, analiseId = null) {
-        const analise = analiseId ? db.getAnalise(analiseId) : null;
-        const talhao = talhaoId ? db.getTalhao(talhaoId) : (analise ? db.getTalhao(analise.talhaoId) : null);
-        const cliente = talhao ? db.getCliente(talhao.clienteId) : null;
+    async showForm(talhaoId, analiseId = null) {
+        if (!window.db) {
+            console.warn('Database não está pronto ainda');
+            setTimeout(() => this.showForm(talhaoId, analiseId), 200);
+            return;
+        }
+        
+        let analise = null;
+        let talhao = null;
+        let cliente = null;
+        
+        try {
+            if (analiseId) {
+                const analiseResult = window.db.getAnalise(analiseId);
+                analise = analiseResult instanceof Promise ? await analiseResult : analiseResult;
+            }
+            
+            if (talhaoId) {
+                const talhaoResult = window.db.getTalhao(talhaoId);
+                talhao = talhaoResult instanceof Promise ? await talhaoResult : talhaoResult;
+            } else if (analise) {
+                const talhaoResult = window.db.getTalhao(analise.talhaoId);
+                talhao = talhaoResult instanceof Promise ? await talhaoResult : talhaoResult;
+            }
+            
+            if (talhao) {
+                const clienteResult = window.db.getCliente(talhao.clienteId);
+                cliente = clienteResult instanceof Promise ? await clienteResult : clienteResult;
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dados do formulário:', error);
+        }
         const culturaAlvo = talhao?.culturaAlvo || analise?.culturaAlvo || '';
         
         const html = `

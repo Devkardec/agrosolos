@@ -19,8 +19,21 @@ class ColetaCampoUI {
     }
 
     // ========== ABRIR MODAL DE NOVA COLETA ==========
-    showNovaColetaModal() {
-        const clientes = db.getClientes();
+    async showNovaColetaModal() {
+        if (!window.db) {
+            console.warn('Database não está pronto ainda, aguardando...');
+            setTimeout(() => this.showNovaColetaModal(), 200);
+            return;
+        }
+        
+        let clientes = [];
+        try {
+            const clientesResult = window.db.getClientes();
+            clientes = clientesResult instanceof Promise ? await clientesResult : clientesResult;
+        } catch (error) {
+            console.error('Erro ao carregar clientes:', error);
+            clientes = [];
+        }
         
         if (clientes.length === 0) {
             alert('Por favor, cadastre pelo menos um cliente antes de iniciar uma coleta.');
@@ -77,20 +90,30 @@ class ColetaCampoUI {
         document.body.insertAdjacentHTML('beforeend', html);
     }
 
-    onClienteChange() {
-        const clienteId = document.getElementById('selectCliente').value;
+    async onClienteChange() {
+        const clienteId = document.getElementById('selectCliente')?.value;
         const selectTalhao = document.getElementById('selectTalhao');
         
-        selectTalhao.innerHTML = '<option value="">Selecione o talhão</option>';
+        if (!selectTalhao || !clienteId || !window.db) {
+            return;
+        }
         
-        if (clienteId) {
-            const talhoes = db.getTalhoes(clienteId);
+        selectTalhao.innerHTML = '<option value="">Carregando...</option>';
+        
+        try {
+            const talhoesResult = window.db.getTalhoes(clienteId);
+            const talhoes = talhoesResult instanceof Promise ? await talhoesResult : talhoesResult;
+            
+            selectTalhao.innerHTML = '<option value="">Selecione o talhão</option>';
             talhoes.forEach(talhao => {
                 const option = document.createElement('option');
                 option.value = talhao.id;
-                option.textContent = `${talhao.nome} (${getCulturaData(talhao.culturaAlvo)?.nome || talhao.culturaAlvo})`;
+                option.textContent = `${talhao.nome} (${window.getCulturaData ? (window.getCulturaData(talhao.culturaAlvo)?.nome || talhao.culturaAlvo) : talhao.culturaAlvo})`;
                 selectTalhao.appendChild(option);
             });
+        } catch (error) {
+            console.error('Erro ao carregar talhões:', error);
+            selectTalhao.innerHTML = '<option value="">Erro ao carregar talhões</option>';
         }
     }
 
@@ -102,11 +125,16 @@ class ColetaCampoUI {
     }
 
     // ========== INICIAR COLETA ==========
-    iniciarColeta(event) {
+    async iniciarColeta(event) {
         event.preventDefault();
         
-        const clienteId = document.getElementById('selectCliente').value;
-        const talhaoId = document.getElementById('selectTalhao').value;
+        if (!window.db) {
+            alert('Banco de dados não está pronto. Aguarde alguns instantes.');
+            return;
+        }
+        
+        const clienteId = document.getElementById('selectCliente')?.value;
+        const talhaoId = document.getElementById('selectTalhao')?.value;
         
         if (!clienteId || !talhaoId) {
             alert('Por favor, selecione o cliente e o talhão.');
@@ -124,17 +152,36 @@ class ColetaCampoUI {
             dataInicio: new Date().toISOString()
         };
         
-        this.currentColeta = db.addColeta(coleta);
-        
-        // Renderizar tela de coleta
-        this.renderColetaScreen();
+        try {
+            this.currentColeta = await window.db.addColeta(coleta);
+            // Renderizar tela de coleta
+            await this.renderColetaScreen();
+        } catch (error) {
+            console.error('Erro ao iniciar coleta:', error);
+            alert('Erro ao iniciar coleta. Tente novamente.');
+        }
     }
 
     // ========== RENDERIZAR TELA DE COLETA ==========
-    renderColetaScreen() {
+    async renderColetaScreen() {
+        if (!this.currentColeta || !window.db) {
+            console.error('Coleta ou banco de dados não disponível');
+            return;
+        }
+        
         const coleta = this.currentColeta;
-        const cliente = db.getCliente(coleta.clienteId);
-        const talhao = db.getTalhao(coleta.talhaoId);
+        let cliente = null;
+        let talhao = null;
+        
+        try {
+            const clienteResult = window.db.getCliente(coleta.clienteId);
+            cliente = clienteResult instanceof Promise ? await clienteResult : clienteResult;
+            
+            const talhaoResult = window.db.getTalhao(coleta.talhaoId);
+            talhao = talhaoResult instanceof Promise ? await talhaoResult : talhaoResult;
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+        }
         
         const html = `
             <div class="mb-6">
@@ -321,14 +368,14 @@ class ColetaCampoUI {
     }
 
     // ========== MARCAR SUBAMOSTRA ==========
-    marcarSubamostra() {
+    async marcarSubamostra() {
         if (!this.currentPosition) {
             alert('Aguardando posição GPS... Por favor, aguarde alguns segundos.');
             return;
         }
 
-        if (!this.currentColeta) {
-            alert('Erro: Coleta não encontrada.');
+        if (!this.currentColeta || !window.db) {
+            alert('Erro: Coleta não encontrada ou banco de dados não disponível.');
             return;
         }
 
@@ -339,19 +386,36 @@ class ColetaCampoUI {
             timestamp: new Date().toISOString()
         };
 
-        db.addSubamostra(this.currentColeta.id, subamostra);
-        
-        // Atualizar coleta atual
-        this.currentColeta = db.getColeta(this.currentColeta.id);
-        
-        // Atualizar UI
-        this.atualizarUI();
-        
-        // Adicionar marcador no mapa
-        const marker = L.marker([subamostra.latitude, subamostra.longitude])
-            .addTo(this.map)
-            .bindPopup(`Subamostra ${this.currentColeta.subamostras.length}<br>${new Date(subamostra.timestamp).toLocaleString('pt-BR')}`);
-        this.markers.push(marker);
+        try {
+            await window.db.addSubamostra(this.currentColeta.id, subamostra);
+            
+            // Atualizar coleta atual
+            const coletaResult = window.db.getColeta(this.currentColeta.id);
+            this.currentColeta = coletaResult instanceof Promise ? await coletaResult : coletaResult;
+            
+            // Atualizar UI
+            this.atualizarUI();
+            
+            // Adicionar marcador no mapa
+            if (this.map) {
+                const marker = L.marker([subamostra.latitude, subamostra.longitude])
+                    .addTo(this.map)
+                    .bindPopup(`Subamostra ${this.currentColeta.subamostras?.length || 0}<br>${new Date(subamostra.timestamp).toLocaleString('pt-BR')}`);
+                this.markers.push(marker);
+                
+                // Atualizar polilinha
+                if (this.currentColeta.subamostras && this.currentColeta.subamostras.length > 1) {
+                    const pontos = this.currentColeta.subamostras.map(s => [s.latitude, s.longitude]);
+                    if (this.polyline) {
+                        this.map.removeLayer(this.polyline);
+                    }
+                    this.polyline = L.polyline(pontos, { color: '#22c55e', weight: 3 }).addTo(this.map);
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao adicionar subamostra:', error);
+            alert('Erro ao salvar subamostra. Tente novamente.');
+        }
 
         // Atualizar polilinha
         if (this.currentColeta.subamostras.length > 1) {
@@ -371,11 +435,15 @@ class ColetaCampoUI {
     }
 
     // ========== ATUALIZAR UI ==========
-    atualizarUI() {
+    async atualizarUI() {
         if (!this.currentColeta) return;
         
-        const coleta = db.getColeta(this.currentColeta.id);
-        document.getElementById('contadorSubamostras').textContent = coleta.subamostras?.length || 0;
+        // Usar coleta atual em memória ao invés de buscar novamente
+        const coleta = this.currentColeta;
+        const contadorEl = document.getElementById('contadorSubamostras');
+        if (contadorEl) {
+            contadorEl.textContent = coleta.subamostras?.length || 0;
+        }
         
         const lista = document.getElementById('listaSubamostras');
         if (lista) {
@@ -403,10 +471,21 @@ class ColetaCampoUI {
     }
 
     // ========== FINALIZAR COLETA ==========
-    finalizarColeta() {
-        if (!this.currentColeta) return;
+    async finalizarColeta() {
+        if (!this.currentColeta || !window.db) {
+            alert('Coleta não disponível ou banco de dados não está pronto.');
+            return;
+        }
 
-        const coleta = db.getColeta(this.currentColeta.id);
+        let coleta;
+        try {
+            const coletaResult = window.db.getColeta(this.currentColeta.id);
+            coleta = coletaResult instanceof Promise ? await coletaResult : coletaResult;
+        } catch (error) {
+            console.error('Erro ao carregar coleta:', error);
+            alert('Erro ao finalizar coleta.');
+            return;
+        }
         
         if (!coleta.subamostras || coleta.subamostras.length === 0) {
             if (!confirm('Nenhuma subamostra foi coletada. Deseja realmente finalizar?')) {
@@ -421,10 +500,14 @@ class ColetaCampoUI {
         }
 
         // Atualizar status
-        db.updateColeta(this.currentColeta.id, {
-            status: 'finalizada',
-            dataFim: new Date().toISOString()
-        });
+        try {
+            await window.db.updateColeta(this.currentColeta.id, {
+                status: 'finalizada',
+                dataFim: new Date().toISOString()
+            });
+        } catch (error) {
+            console.error('Erro ao atualizar coleta:', error);
+        }
 
         alert(`Coleta finalizada com sucesso! ${coleta.subamostras?.length || 0} subamostra(s) coletada(s).`);
         
@@ -433,15 +516,27 @@ class ColetaCampoUI {
     }
 
     // ========== GERAR GUIA DE REMESSA ==========
-    gerarGuiaRemessa() {
-        if (!this.currentColeta) {
-            alert('Nenhuma coleta em andamento.');
+    async gerarGuiaRemessa() {
+        if (!this.currentColeta || !window.db) {
+            alert('Nenhuma coleta em andamento ou banco de dados não disponível.');
             return;
         }
 
-        const coleta = db.getColeta(this.currentColeta.id);
-        const cliente = db.getCliente(coleta.clienteId);
-        const talhao = db.getTalhao(coleta.talhaoId);
+        let coleta, cliente, talhao;
+        try {
+            const coletaResult = window.db.getColeta(this.currentColeta.id);
+            coleta = coletaResult instanceof Promise ? await coletaResult : coletaResult;
+            
+            const clienteResult = window.db.getCliente(coleta.clienteId);
+            cliente = clienteResult instanceof Promise ? await clienteResult : clienteResult;
+            
+            const talhaoResult = window.db.getTalhao(coleta.talhaoId);
+            talhao = talhaoResult instanceof Promise ? await talhaoResult : talhaoResult;
+        } catch (error) {
+            console.error('Erro ao carregar dados para guia de remessa:', error);
+            alert('Erro ao gerar guia de remessa.');
+            return;
+        }
 
         if (!coleta.subamostras || coleta.subamostras.length === 0) {
             alert('Não há subamostras coletadas para gerar o guia de remessa.');

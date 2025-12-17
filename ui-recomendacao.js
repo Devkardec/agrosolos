@@ -9,26 +9,50 @@ class RecomendacaoUI {
     init() {}
 
     // ========== GERAR RECOMENDAÇÃO ==========
-    gerarRecomendacao(analiseId) {
-        this.render(analiseId);
+    async gerarRecomendacao(analiseId) {
+        await this.render(analiseId);
     }
 
     // ========== RENDERIZAR TELA DE RECOMENDAÇÃO ==========
-    render(analiseId) {
+    async render(analiseId) {
         if (!analiseId) {
             alert('Análise não encontrada');
             return;
         }
-
-        this.currentAnaliseId = analiseId;
-        const analise = db.getAnalise(analiseId);
-        if (!analise) {
-            alert('Análise não encontrada');
+        
+        if (!window.db) {
+            console.warn('Database não está pronto ainda');
+            setTimeout(() => this.render(analiseId), 200);
             return;
         }
 
-        const talhao = db.getTalhao(analise.talhaoId);
-        const cliente = talhao ? db.getCliente(talhao.clienteId) : null;
+        this.currentAnaliseId = analiseId;
+        
+        let analise = null;
+        let talhao = null;
+        let cliente = null;
+        
+        try {
+            const analiseResult = window.db.getAnalise(analiseId);
+            analise = analiseResult instanceof Promise ? await analiseResult : analiseResult;
+            
+            if (!analise) {
+                alert('Análise não encontrada');
+                return;
+            }
+            
+            const talhaoResult = window.db.getTalhao(analise.talhaoId);
+            talhao = talhaoResult instanceof Promise ? await talhaoResult : talhaoResult;
+            
+            if (talhao) {
+                const clienteResult = window.db.getCliente(talhao.clienteId);
+                cliente = clienteResult instanceof Promise ? await clienteResult : clienteResult;
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dados da recomendação:', error);
+            alert('Erro ao carregar análise.');
+            return;
+        }
 
         // Calcular V% atual
         const v1 = calcularV(analise.ca || 0, analise.mg || 0, analise.k || 0, analise.hal || 0);
@@ -78,10 +102,21 @@ class RecomendacaoUI {
             dadosSolo: window.dadosSolo
         };
 
-        const recomendacaoSalva = db.addRecomendacao(recomendacao);
+        // Salvar recomendação de forma assíncrona
+        let recomendacaoSalva = null;
+        if (window.db) {
+            try {
+                recomendacaoSalva = await window.db.addRecomendacao(recomendacao);
+            } catch (error) {
+                console.error('Erro ao salvar recomendação:', error);
+                recomendacaoSalva = recomendacao; // Usar objeto local se falhar
+            }
+        } else {
+            recomendacaoSalva = recomendacao;
+        }
 
         // Renderizar resultados
-        this.renderResultados(recomendacaoSalva, analise, talhao, cliente);
+        this.renderResultados(recomendacaoSalva || recomendacao, analise, talhao, cliente);
     }
 
     calcularCorrecaoPK(analise, talhao) {
@@ -205,17 +240,51 @@ class RecomendacaoUI {
     }
 
     // ========== GERAR PDF DO RELATÓRIO FINAL ==========
-    gerarPDF(recomendacaoId) {
-        const recomendacao = db.getRecomendacoes().find(r => r.id === recomendacaoId);
+    async gerarPDF(recomendacaoId) {
+        if (!window.db) {
+            alert('Banco de dados não está pronto.');
+            return;
+        }
+        
+        let recomendacoes = [];
+        try {
+            const recomendacoesResult = window.db.getRecomendacoes();
+            recomendacoes = recomendacoesResult instanceof Promise ? await recomendacoesResult : recomendacoesResult;
+        } catch (error) {
+            console.error('Erro ao carregar recomendações:', error);
+            alert('Erro ao carregar recomendação.');
+            return;
+        }
+        
+        const recomendacao = recomendacoes.find(r => r.id === recomendacaoId);
         if (!recomendacao) {
             alert('Recomendação não encontrada');
             return;
         }
 
-        const analise = db.getAnalise(recomendacao.analiseId);
-        const talhao = db.getTalhao(recomendacao.talhaoId);
-        const cliente = talhao ? db.getCliente(talhao.clienteId) : null;
-        const coletas = db.getColetas(recomendacao.talhaoId);
+        let analise = null;
+        let talhao = null;
+        let cliente = null;
+        let coletas = [];
+        
+        try {
+            const analiseResult = window.db.getAnalise(recomendacao.analiseId);
+            analise = analiseResult instanceof Promise ? await analiseResult : analiseResult;
+            
+            const talhaoResult = window.db.getTalhao(recomendacao.talhaoId);
+            talhao = talhaoResult instanceof Promise ? await talhaoResult : talhaoResult;
+            
+            if (talhao) {
+                const clienteResult = window.db.getCliente(talhao.clienteId);
+                cliente = clienteResult instanceof Promise ? await clienteResult : clienteResult;
+            }
+            
+            const coletasResult = window.db.getColetas(recomendacao.talhaoId);
+            coletas = coletasResult instanceof Promise ? await coletasResult : coletasResult;
+        } catch (error) {
+            console.error('Erro ao carregar dados para PDF:', error);
+            alert('Erro ao gerar PDF. Alguns dados podem estar faltando.');
+        }
 
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
