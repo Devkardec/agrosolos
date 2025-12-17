@@ -27,6 +27,7 @@
     <!-- Firebase SDK (Compat Mode) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
@@ -55,8 +56,18 @@
     </header>
 
     <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <!-- Tela de Autenticação (Login/Cadastro) -->
+        <div id="screen-auth" class="screen">
+            <div class="flex items-center justify-center min-h-screen">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                    <p class="text-gray-600">Carregando...</p>
+                </div>
+            </div>
+        </div>
+        
         <!-- Tela Dashboard -->
-        <div id="screen-dashboard" class="screen"></div>
+        <div id="screen-dashboard" class="screen hidden"></div>
 
         <!-- Tela CRM (Clientes e Talhões) -->
         <div id="screen-crm" class="screen hidden"></div>
@@ -85,24 +96,27 @@
     <!-- Scripts - Ordem de carregamento importante -->
     <!-- 0. Configuração do Firebase (deve vir antes do database.js) -->
     <script src="firebase-config.js"></script>
-    <!-- 1. Banco de dados e dados de culturas -->
+    <!-- 1. Autenticação -->
+    <script src="auth.js"></script>
+    <!-- 2. Banco de dados e dados de culturas -->
     <script src="database.js"></script>
     <script src="culturas-db.js"></script>
     
-    <!-- 2. Módulos de cálculo -->
+    <!-- 3. Módulos de cálculo -->
     <script src="calculos.js"></script>
     
-    <!-- 3. Navegação -->
+    <!-- 4. Navegação -->
     <script src="navigation.js"></script>
     
-    <!-- 4. Módulos de UI -->
+    <!-- 5. Módulos de UI -->
+    <script src="ui-auth.js"></script>
     <script src="ui-dashboard.js"></script>
     <script src="ui-crm.js"></script>
     <script src="ui-coleta-campo.js"></script>
     <script src="ui-analise.js"></script>
     <script src="ui-recomendacao.js"></script>
     
-    <!-- 5. App principal (orquestrador) -->
+    <!-- 6. App principal (orquestrador) -->
     <script src="app.js"></script>
     
     <script>

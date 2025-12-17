@@ -9,12 +9,40 @@ class DashboardUI {
         this.render();
     }
 
-    render() {
-        const clientes = db.getClientes();
-        const talhoes = db.getTalhoes();
-        const coletas = db.getColetas();
-        const analises = db.getAnalises();
-        const recomendacoes = db.getRecomendacoes();
+    async render() {
+        // Aguardar db estar pronto
+        if (!window.db) {
+            console.warn('Database não está pronto ainda, aguardando...');
+            setTimeout(() => this.render(), 200);
+            return;
+        }
+        
+        // Obter dados (pode retornar Promise ou valor direto)
+        let clientes, talhoes, coletas, analises, recomendacoes;
+        
+        try {
+            const clientesResult = window.db.getClientes();
+            clientes = clientesResult instanceof Promise ? await clientesResult : clientesResult;
+            
+            const talhoesResult = window.db.getTalhoes();
+            talhoes = talhoesResult instanceof Promise ? await talhoesResult : talhoesResult;
+            
+            const coletasResult = window.db.getColetas();
+            coletas = coletasResult instanceof Promise ? await coletasResult : coletasResult;
+            
+            const analisesResult = window.db.getAnalises();
+            analises = analisesResult instanceof Promise ? await analisesResult : analisesResult;
+            
+            const recomendacoesResult = window.db.getRecomendacoes();
+            recomendacoes = recomendacoesResult instanceof Promise ? await recomendacoesResult : recomendacoesResult;
+        } catch (error) {
+            console.error('Erro ao carregar dados do dashboard:', error);
+            clientes = [];
+            talhoes = [];
+            coletas = [];
+            analises = [];
+            recomendacoes = [];
+        }
 
         const html = `
             <div class="mb-6">

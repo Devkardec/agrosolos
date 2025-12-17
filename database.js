@@ -43,8 +43,14 @@ class Database {
     // ========== OPERAÇÕES CRUD PARA CLIENTES ==========
     getClientes() {
         if (this.useFirebase) {
-            // Retornar Promise para Firebase
-            return this.firebaseDb.collection('clientes').get()
+            // Obter userId do usuário autenticado
+            const userId = this.getUserId();
+            if (!userId) return Promise.resolve([]);
+            
+            // Retornar Promise para Firebase (filtrar por userId)
+            return this.firebaseDb.collection('clientes')
+                .where('userId', '==', userId)
+                .get()
                 .then(snapshot => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
                 .catch(error => {
                     console.error('Erro ao buscar clientes no Firebase:', error);
@@ -53,6 +59,14 @@ class Database {
         }
         // Retornar valor síncrono para LocalStorage
         return this.load().clientes || [];
+    }
+    
+    // Método auxiliar para obter userId
+    getUserId() {
+        if (window.auth && window.auth.getCurrentUser()) {
+            return window.auth.getCurrentUser().uid;
+        }
+        return null;
     }
 
     async getCliente(id) {
@@ -74,6 +88,10 @@ class Database {
     async addCliente(cliente) {
         if (this.useFirebase) {
             try {
+                const userId = this.getUserId();
+                if (!userId) throw new Error('Usuário não autenticado');
+                
+                cliente.userId = userId;
                 cliente.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 const docRef = await this.firebaseDb.collection('clientes').add(cliente);
                 return { id: docRef.id, ...cliente };
@@ -136,7 +154,10 @@ class Database {
     async getTalhoes(clienteId = null) {
         if (this.useFirebase) {
             try {
-                let query = this.firebaseDb.collection('talhoes');
+                const userId = this.getUserId();
+                if (!userId) return [];
+                
+                let query = this.firebaseDb.collection('talhoes').where('userId', '==', userId);
                 if (clienteId) {
                     query = query.where('clienteId', '==', clienteId);
                 }
@@ -173,6 +194,10 @@ class Database {
     async addTalhao(talhao) {
         if (this.useFirebase) {
             try {
+                const userId = this.getUserId();
+                if (!userId) throw new Error('Usuário não autenticado');
+                
+                talhao.userId = userId;
                 talhao.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 const docRef = await this.firebaseDb.collection('talhoes').add(talhao);
                 return { id: docRef.id, ...talhao };
@@ -239,7 +264,10 @@ class Database {
     async getColetas(talhaoId = null) {
         if (this.useFirebase) {
             try {
-                let query = this.firebaseDb.collection('coletas');
+                const userId = this.getUserId();
+                if (!userId) return [];
+                
+                let query = this.firebaseDb.collection('coletas').where('userId', '==', userId);
                 if (talhaoId) {
                     query = query.where('talhaoId', '==', talhaoId);
                 }
@@ -288,6 +316,10 @@ class Database {
     async addColeta(coleta) {
         if (this.useFirebase) {
             try {
+                const userId = this.getUserId();
+                if (!userId) throw new Error('Usuário não autenticado');
+                
+                coleta.userId = userId;
                 coleta.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 if (!coleta.subamostras) {
                     coleta.subamostras = [];
@@ -382,7 +414,10 @@ class Database {
     async getAnalises(talhaoId = null) {
         if (this.useFirebase) {
             try {
-                let query = this.firebaseDb.collection('analises');
+                const userId = this.getUserId();
+                if (!userId) return [];
+                
+                let query = this.firebaseDb.collection('analises').where('userId', '==', userId);
                 if (talhaoId) {
                     query = query.where('talhaoId', '==', talhaoId);
                 }
@@ -419,6 +454,10 @@ class Database {
     async addAnalise(analise) {
         if (this.useFirebase) {
             try {
+                const userId = this.getUserId();
+                if (!userId) throw new Error('Usuário não autenticado');
+                
+                analise.userId = userId;
                 analise.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 const docRef = await this.firebaseDb.collection('analises').add(analise);
                 return { id: docRef.id, ...analise };
@@ -475,7 +514,10 @@ class Database {
     async getRecomendacoes(analiseId = null) {
         if (this.useFirebase) {
             try {
-                let query = this.firebaseDb.collection('recomendacoes');
+                const userId = this.getUserId();
+                if (!userId) return [];
+                
+                let query = this.firebaseDb.collection('recomendacoes').where('userId', '==', userId);
                 if (analiseId) {
                     query = query.where('analiseId', '==', analiseId);
                 }
@@ -496,6 +538,10 @@ class Database {
     async addRecomendacao(recomendacao) {
         if (this.useFirebase) {
             try {
+                const userId = this.getUserId();
+                if (!userId) throw new Error('Usuário não autenticado');
+                
+                recomendacao.userId = userId;
                 recomendacao.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 const docRef = await this.firebaseDb.collection('recomendacoes').add(recomendacao);
                 return { id: docRef.id, ...recomendacao };

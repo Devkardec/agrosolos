@@ -12,17 +12,20 @@ const firebaseConfig = {
 
 // Inicializar Firebase (usando compat mode)
 let firebaseApp = null;
-let db = null;
+let firebaseDbInstance = null;
+let firebaseAuthInstance = null;
 
 // Função para inicializar após o Firebase estar carregado
 function initFirebase() {
     try {
         if (typeof firebase !== 'undefined' && firebase.initializeApp) {
             firebaseApp = firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
+            firebaseDbInstance = firebase.firestore();
+            firebaseAuthInstance = firebase.auth();
             console.log('Firebase inicializado com sucesso!');
             window.firebaseApp = firebaseApp;
-            window.firebaseDb = db;
+            window.firebaseDb = firebaseDbInstance;
+            window.firebaseAuth = firebaseAuthInstance;
         } else {
             console.warn('Firebase SDK não carregado ainda, aguardando...');
             // Tentar novamente após um delay
