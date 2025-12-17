@@ -4,8 +4,19 @@ const urlsToCache = [
   './',
   './index.html',
   './styles.css',
+  './manifest.json',
   './app.js',
-  './manifest.json'
+  './database.js',
+  './calculos.js',
+  './culturas-db.js',
+  './navigation.js',
+  './ui-dashboard.js',
+  './ui-crm.js',
+  './ui-coleta-campo.js',
+  './ui-analise.js',
+  './ui-recomendacao.js',
+  './gps.js',
+  './logosemfundo.png'
 ];
 
 // Instalar Service Worker
